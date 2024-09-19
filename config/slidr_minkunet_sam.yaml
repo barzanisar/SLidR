@@ -3,7 +3,7 @@ version: "v1.0-trainval"
 working_dir : "output/slidr/nuscenes/"
 
 ##### barza repo setup: results/nuScenes/Pretraining/<desc>/<extra_tag>/ckpts
-desc: slidr_slic_res16unet34c_mocov2_resnet50
+desc: slidr_sam_res16unet34c_mocov2_resnet50
 save_dir: results/nuScenes/
 extra_tag: try_0
 
@@ -12,7 +12,7 @@ wandb:
   enabled: True 
   project: ReconsDistill
   entity: trailab
-  run_name: orig-slidr-slic-nuscenes-res16unet34c-mocov2-resnet50
+  run_name: orig-slidr-sam-nuscenes-res16unet34c-mocov2-resnet50
   dir: '/SLidR/output'
 
 # if set to True, use cylindrical coordinates, otherwise use cartesian
@@ -64,7 +64,7 @@ transforms_mixed : ["DropCuboids", "ResizedCrop", "FlipHorizontal"]
 # loss_superpixels_reduce_all, loss_superpixels_transforms
 losses : ["loss_superpixels_average"]
 # which kind of superpixels to use
-superpixels_type : "slic"
+superpixels_type : "sam"
 # only keep 1 in dataset_skip_step training examples (here use 100% of the data)
 dataset_skip_step : 1
 # path to weights to continue a previous training
@@ -73,4 +73,4 @@ resume_path : Null
 # WARNING: DO NOT CHANGE THE FOLLOWING PARAMETERS
 # ===============================================
 normalize_features : True
-superpixel_size : 150
+superpixel_size : 300
