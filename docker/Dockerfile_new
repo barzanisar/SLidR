@@ -1,0 +1,44 @@
+ARG PYTORCH="2.3.0"
+ARG CUDA="12.1"
+ARG CUDNN="8"
+
+FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
+
+
+# Install dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update
+RUN apt-get update && apt-get install -y git apt-utils ninja-build cmake build-essential  \
+    libopenblas-dev xterm xauth openssh-server tmux wget
+
+RUN apt-get clean
+RUN rm -rf /var/lib/apt/lists/*
+
+##############################################
+ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 6.2 7.0 7.2 7.5 8.0 8.6 8.9+PTX"
+ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
+##############################################
+
+
+
+# For faster build, use more jobs.
+ENV MAX_JOBS=4
+# ENV CUDA_HOME=/usr/local/cuda-12.1 
+RUN git clone --recursive "https://github.com/barzanisar/MinkowskiEngine.git"
+RUN cd MinkowskiEngine; python setup.py install --force_cuda --blas=openblas
+
+# RUN apt-get install libgl1-mesa-glx -y
+RUN pip install spconv-cu120==2.3.6
+
+RUN pip install nuscenes-devkit==1.1.11
+RUN pip install tqdm pyquaternion
+
+RUN pip install pytorch_lightning==1.8.4
+RUN pip install pillow==10.3.0
+RUN pip install scikit-image==0.21.0 
+RUN pip install wandb==0.13.1
+
+WORKDIR /slidr
+RUN git config --global --add safe.directory /slidr
+RUN mkdir assets config datasets downstream model pretrain utils superpixels
+#results weights output superpixels
