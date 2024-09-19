@@ -5,7 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
 import torch.utils.model_zoo as model_zoo
-from torchvision.models.resnet import model_urls
+try:
+    from torchvision.models.resnet import model_urls 
+except:
+    from torchvision.models.resnet import ResNet50_Weights
 from model.modules.resnet_encoder import resnet_encoders
 import model.modules.dino.vision_transformer as dino_vit
 
@@ -93,7 +96,10 @@ class DilationFeatureExtractor(nn.Module):
         self.encoder = Encoder(**params)
 
         if config["image_weights"] == "imagenet":
-            self.encoder.load_state_dict(model_zoo.load_url(model_urls["resnet50"]))
+            try:
+                self.encoder.load_state_dict(model_zoo.load_url(model_urls[config["images_encoder"]])) #ResNet50_Weights.IMAGENET1K_V2.url = resnet50-11ad3fa6.pth, model_urls["resnet50"]=resnet50-0676ba61.pth
+            except:
+                self.encoder.load_state_dict(model_zoo.load_url(ResNet50_Weights.IMAGENET1K_V2.url))
 
         weights = adapt_weights(architecture=config["image_weights"])
         if weights is not None:
@@ -114,10 +120,10 @@ class DilationFeatureExtractor(nn.Module):
     def forward(self, x):
         if self.preprocessing:
             x = self.preprocessing(x)
-        x = self.decoder(self.encoder(x))
+        x = self.decoder(self.encoder(x)) #(24=6views*4, Cin=3->Cout=64, H=224, W=416)
         if self.normalize_feature:
             x = F.normalize(x, p=2, dim=1)
-        return x
+        return x #(24=6views*4, C=64, H=224, W=416)
 
 
 class PPKTFeatureExtractor(nn.Module):
@@ -132,7 +138,10 @@ class PPKTFeatureExtractor(nn.Module):
         self.encoder = Encoder(**params)
 
         if config["image_weights"] == "imagenet":
-            self.encoder.load_state_dict(model_zoo.load_url(model_urls[config["images_encoder"]]))
+            try:
+                self.encoder.load_state_dict(model_zoo.load_url(model_urls[config["images_encoder"]])) #model_urls[config["images_encoder"]] #ResNet50_Weights.IMAGENET1K_V2.url
+            except:
+                self.encoder.load_state_dict(model_zoo.load_url(ResNet50_Weights.IMAGENET1K_V2.url))
 
         if config["image_weights"] not in (None, "imagenet"):
             assert (

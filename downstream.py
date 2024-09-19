@@ -6,11 +6,13 @@ import pytorch_lightning as pl
 from downstream.evaluate import evaluate
 from utils.read_config import generate_config
 from downstream.model_builder import make_model
-from pytorch_lightning.plugins import DDPPlugin
+# from pytorch_lightning.plugins import DDPPlugin
 from downstream.lightning_trainer import LightningDownstream
 from downstream.lightning_datamodule import DownstreamDataModule
 from downstream.dataloader_kitti import make_data_loader as make_data_loader_kitti
 from downstream.dataloader_nuscenes import make_data_loader as make_data_loader_nuscenes
+from pytorch_lightning.strategies import DDPStrategy
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 
 def main():
@@ -38,19 +40,30 @@ def main():
         print(
             "\n" + "\n".join(list(map(lambda x: f"{x[0]:20}: {x[1]}", config.items())))
         )
-    dm = DownstreamDataModule(config)
-    model = make_model(config, config["pretraining_path"])
+    dm = DownstreamDataModule(config) #TODO cache nuscenes
+    model = make_model(config, config["pretraining_path"]) #TODO freeze layers
     if config["num_gpus"] > 1:
         model = ME.MinkowskiSyncBatchNorm.convert_sync_batchnorm(model)
     module = LightningDownstream(model, config)
     path = os.path.join(config["working_dir"], config["datetime"])
+
+    
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=path,
+        filename="{epoch:02d}",
+        every_n_epochs=1,
+        save_top_k=-1,
+        save_last=True
+    )
+
     trainer = pl.Trainer(
         gpus=config["num_gpus"],
-        accelerator="ddp",
+        accelerator="cuda",
         default_root_dir=path,
-        checkpoint_callback=True,
+        # checkpoint_callback=True,
+        callbacks=[checkpoint_callback],
         max_epochs=config["num_epochs"],
-        plugins=DDPPlugin(find_unused_parameters=False),
+        # plugins=DDPStrategy(find_unused_parameters=False),
         num_sanity_val_steps=0,
         resume_from_checkpoint=config["resume_path"],
         check_val_every_n_epoch=1,
