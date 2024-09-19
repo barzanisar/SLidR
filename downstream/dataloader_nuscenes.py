@@ -52,8 +52,8 @@ def custom_collate_fn(list_data):
         N = coords[batch_id].shape[0]
         coords_batch.append(
             torch.cat((torch.ones(N, 1, dtype=torch.int32) * batch_id, coo), 1)
-        )
-        len_batch.append(N)
+        ) #append bid to voxel coords
+        len_batch.append(N) #num voxels
 
     # Collate all lists on their first dimension
     coords_batch = torch.cat(coords_batch, 0).int()
@@ -62,12 +62,12 @@ def custom_collate_fn(list_data):
         labels_batch = torch.cat(labels, 0).long()
         return {
             "pc": xyz,  # point cloud
-            "sinput_C": coords_batch,  # discrete coordinates (ME)
-            "sinput_F": feats_batch,  # point features (N, 3)
-            "len_batch": len_batch,  # length of each batch
-            "labels": labels_batch,  # labels for each (voxelized) point
+            "sinput_C": coords_batch,  # discrete coordinates (ME) i.e. voxel coords bid, xyz
+            "sinput_F": feats_batch,  # voxel features (N, 1) i.e. intensities
+            "len_batch": len_batch,  # num voxels in each pc
+            "labels": labels_batch,  # labels for each voxel
             "evaluation_labels": evaluation_labels,  # labels for each point
-            "inverse_indexes": inverse_indexes,  # labels for each point
+            "inverse_indexes": inverse_indexes,  # voxel to pc id
         }
     else:
         return {
@@ -91,12 +91,15 @@ class NuScenesDataset(Dataset):
         self.voxel_size = config["voxel_size"]
         self.cylinder = config["cylindrical_coordinates"]
 
+        version=config['version']
+        nuscenes_path = f"datasets/nuscenes/{version}"
+
         if phase != "test":
             if cached_nuscenes is not None:
                 self.nusc = cached_nuscenes
             else:
                 self.nusc = NuScenes(
-                    version="v1.0-trainval", dataroot="datasets/nuscenes", verbose=False
+                    version=version, dataroot=nuscenes_path, verbose=False
                 )
         else:
             self.nusc = NuScenes(
@@ -185,17 +188,17 @@ class NuScenesDataset(Dataset):
         # Voxelization
         discrete_coords, indexes, inverse_indexes = sparse_quantize(
             coords_aug, return_index=True, return_inverse=True
-        )
+        ) #indexes: pc2voxel_id, inverse_indexes: voxel2pc_id
 
         # use those voxels features
-        unique_feats = torch.tensor(points[indexes][:, 3:])
+        unique_feats = torch.tensor(points[indexes][:, 3:]) #voxel wise intensities
 
         if self.labels:
             points_labels = torch.tensor(
                 np.vectorize(self.eval_labels.__getitem__)(points_labels),
                 dtype=torch.int32,
             )
-            unique_labels = points_labels[indexes]
+            unique_labels = points_labels[indexes] #voxel wise labels
 
         if self.labels:
             return (

@@ -56,27 +56,70 @@ def minkunet_collate_pair_fn(list_data):
         pairing_points[batch_id][:] += offset
         pairing_images[batch_id][:, 0] += batch_id * images[0].shape[0]
 
-        batch_n_points.append(coords[batch_id].shape[0])
-        batch_n_pairings.append(pairing_points[batch_id].shape[0])
+        batch_n_points.append(coords[batch_id].shape[0]) #num voxels in this pc
+        batch_n_pairings.append(pairing_points[batch_id].shape[0]) #num fov pts in this pc
         offset += coords[batch_id].shape[0]
 
     # Concatenate all lists
-    coords_batch = torch.cat(coords, 0).int()
-    pairing_points = torch.tensor(np.concatenate(pairing_points))
-    pairing_images = torch.tensor(np.concatenate(pairing_images))
-    feats_batch = torch.cat(feats, 0).float()
-    images_batch = torch.cat(images, 0).float()
-    superpixels_batch = torch.tensor(np.concatenate(superpixels))
+    coords_batch = torch.cat(coords, 0).int() #(num voxels in batch, 4=bid,rho,phi,z vox coordinate)
+    pairing_points = torch.tensor(np.concatenate(pairing_points))#(num pairing pts in batch)
+    pairing_images = torch.tensor(np.concatenate(pairing_images))#(num pairing pts in batch, 3)
+    feats_batch = torch.cat(feats, 0).float() #(num voxels in batch, 1=intensity)
+    images_batch = torch.cat(images, 0).float() #(6 views*4 bs, 3, 224, 416)
+    superpixels_batch = torch.tensor(np.concatenate(superpixels)) #(6 views*4 bs, 224, 416)
     return {
         "sinput_C": coords_batch,
         "sinput_F": feats_batch,
         "input_I": images_batch,
         "pairing_points": pairing_points,
         "pairing_images": pairing_images,
-        "batch_n_pairings": batch_n_pairings,
-        "inverse_indexes": inverse_indexes,
+        "batch_n_pairings": batch_n_pairings, #num fov pts in each pc of batch
+        "inverse_indexes": inverse_indexes, # list of 4=bs inverse_indices (each element of len num pts in pc)
         "superpixels": superpixels_batch,
     }
+
+def visualize(pc, intensity, images, pairing_points, pairing_images, superpixels):
+    import matplotlib.pyplot as plt
+
+    cam_view = 0
+    # fig = plt.figure(figsize=(8.32,4.48))
+    # ax = fig.add_axes([0, 0, 1, 1])
+    # plt.axis('off')
+    # ax.imshow(images[cam_view].permute(1,2,0))
+    # fig.show()
+
+    # fig = plt.figure(figsize=(8.32,4.48))
+    # ax = fig.add_axes([0, 0, 1, 1])
+    # plt.axis('off')
+    cam_view_mask = pairing_images[:,0] == cam_view
+    point_intensity_cam_view = intensity[pairing_points[cam_view_mask]]
+    vu_pix_cam_view = pairing_images[cam_view_mask, 1:]
+    uv_pix = np.flip(vu_pix_cam_view, axis=1)
+    image_per_point_cam_view = images[cam_view].permute(1,2,0)[vu_pix_cam_view[:,0], vu_pix_cam_view[:,1], :]
+    # ax.scatter(uv_pix[:,0], uv_pix[:, 1], c=point_intensity_cam_view, s=15)
+    # ax.imshow(np.zeros((224,416,4)))
+    # fig.show()
+
+    fig = plt.figure(figsize=(8.32,4.48))
+    ax = fig.add_axes([0, 0, 1, 1])
+    plt.axis('off')
+    ax.imshow(superpixels[cam_view], cmap='gray', alpha=0.5)
+    ax.scatter(uv_pix[:,0], uv_pix[:, 1], c=image_per_point_cam_view, s=15, alpha=0.8)
+    fig.show()
+
+    fig = plt.figure(figsize=(8.32,4.48))
+    ax = fig.add_axes([0, 0, 1, 1])
+    plt.axis('off')
+    ax.imshow(images[cam_view].permute(1,2,0))
+    ax.scatter(uv_pix[:,0], uv_pix[:, 1], c=point_intensity_cam_view, s=15, alpha=0.5)
+    fig.show()
+
+    fig = plt.figure(figsize=(12, 12))
+    ax = fig.add_subplot(projection='3d')
+    ax.scatter(pc[:,0], pc[:,1], pc[:,2], s=10, c=intensity)
+    fig.show()
+
+    b=1
 
 
 class NuScenesMatchDataset(Dataset):
@@ -102,11 +145,13 @@ class NuScenesMatchDataset(Dataset):
         self.superpixels_type = config["superpixels_type"]
         self.bilinear_decoder = config["decoder"] == "bilinear"
 
+        version=config['version']
+        nuscenes_path = f"datasets/nuscenes/{version}"
         if "cached_nuscenes" in kwargs:
             self.nusc = kwargs["cached_nuscenes"]
         else:
             self.nusc = NuScenes(
-                version="v1.0-trainval", dataroot="datasets/nuscenes", verbose=False
+                version=version, dataroot=nuscenes_path, verbose=False
             )
 
         self.list_keyframes = []
@@ -220,7 +265,7 @@ class NuScenesMatchDataset(Dataset):
                 pc.points[:3, :],
                 np.array(cs_record["camera_intrinsic"]),
                 normalize=True,
-            )
+            ) #u,v,1 pixel coords for points
 
             # Remove points that are either outside or behind the camera.
             # Also make sure points are at least 1m in front of the camera to avoid
@@ -236,7 +281,7 @@ class NuScenesMatchDataset(Dataset):
             matching_points = np.where(mask)[0]
             matching_pixels = np.round(
                 np.flip(points[matching_points], axis=1)
-            ).astype(np.int64)
+            ).astype(np.int64) #u, v pixel floats to v,u pixel integers 
             images.append(im / 255)
             pairing_points = np.concatenate((pairing_points, matching_points))
             pairing_images = np.concatenate(
@@ -251,7 +296,13 @@ class NuScenesMatchDataset(Dataset):
                     ),
                 )
             )
-        return pc_ref.T, images, pairing_points, pairing_images, np.stack(superpixels)
+
+        # pc_ref: (4, num pts in this pc) orig pc in lidar frame
+        # images: a list of 6 camera images (diff cam views) of size (900, 1600, 3) i.e. see camera_list
+        # pairing_points: (N=num FOV pts) indices of pts projected onto image views
+        # pairing_images: (N, 3) [cam_idx in camera_list, v pixel, u pixel] of the points projected on all 6 image views
+        # np.stack(superpixels): (6, 900, 1600) slic segmentation for 6 image views, each pixel is given a segment id it belongs to
+        return pc_ref.T, images, pairing_points, pairing_images, np.stack(superpixels) 
 
     def __len__(self):
         return len(self.list_keyframes)
@@ -266,10 +317,11 @@ class NuScenesMatchDataset(Dataset):
         ) = self.map_pointcloud_to_image(self.list_keyframes[idx])
         superpixels = torch.tensor(superpixels)
 
-        intensity = torch.tensor(pc[:, 3:])
-        pc = torch.tensor(pc[:, :3])
-        images = torch.tensor(np.array(images, dtype=np.float32).transpose(0, 3, 1, 2))
+        intensity = torch.tensor(pc[:, 3:]) # (num pts pc, 1)
+        pc = torch.tensor(pc[:, :3]) # (num pts pc, 3)
+        images = torch.tensor(np.array(images, dtype=np.float32).transpose(0, 3, 1, 2))# (6,3,900, 1600)
 
+        # visualize(pc, intensity, images, pairing_points, pairing_images, superpixels)
         if self.cloud_transforms:
             pc = self.cloud_transforms(pc)
         if self.mixed_transforms:
@@ -284,6 +336,7 @@ class NuScenesMatchDataset(Dataset):
                 pc, intensity, images, pairing_points, pairing_images, superpixels
             )
 
+        # visualize(pc, intensity, images, pairing_points, pairing_images, superpixels)
         if self.cylinder:
             # Transform to cylinder coordinate and scale for voxel size
             x, y, z = pc.T
@@ -295,11 +348,13 @@ class NuScenesMatchDataset(Dataset):
             coords_aug = pc / self.voxel_size
 
         # Voxelization with MinkowskiEngine
+        # inverse_indexes (len == num pts): for each pt, gives the corresponding index of discrete coord i.e. used to retrieve point wise features from voxel features
+        # indexes (len == num voxels or discrete coords): for each discrete coord, gives its corresponding pt index i.e. used to retrieve voxel intensities from point intensities
         discrete_coords, indexes, inverse_indexes = ME.utils.sparse_quantize(
             coords_aug.contiguous(), return_index=True, return_inverse=True
         )
-        # indexes here are the indexes of points kept after the voxelization
-        pairing_points = inverse_indexes[pairing_points]
+        # pts here are the indexes of voxels corresponding to pairing points 
+        pairing_points = inverse_indexes[pairing_points] #inverse indexes for pairing points i.e. used to retrieve pairing-point wise features from voxel features
 
         unique_feats = intensity[indexes]
 
@@ -309,14 +364,14 @@ class NuScenesMatchDataset(Dataset):
                 discrete_coords,
             ),
             1,
-        )
+        ) #0, rho, phi, z voxel coord --> (num voxels, 4)
 
         return (
-            discrete_coords,
-            unique_feats,
-            images,
-            pairing_points,
-            pairing_images,
-            inverse_indexes,
-            superpixels,
+            discrete_coords, #(num voxels, 4= 0, rho, phi, z of the voxel)
+            unique_feats, #(num voxels, 1=voxel intensity)
+            images, # (6,3,224,416)
+            pairing_points, #(Num pairing pts, 1=inverse index (voxel2pc))
+            pairing_images, #(Num pairing pts, 3=cam id, v pixel, u pixel)
+            inverse_indexes, #(num pts, 1=inverse index)
+            superpixels, #(6 img views, 224, 416)
         )

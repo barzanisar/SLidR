@@ -58,35 +58,35 @@ def spconv_collate_pair_fn(list_data):
         superpixels,
     ) = list(zip(*list_data))
     batch_n_points, batch_n_pairings = [], []
-
+    # pairing pts (N=num FOV pts) are indices of FOV pts in pc 
     pc_batch = []
     offset = 0
     for batch_id in range(len(pc)):
         pc_batch.append(torch.cat((torch.ones((pc[batch_id].shape[0], 1)) * batch_id, pc[batch_id]), 1))
         pairing_points[batch_id][:] += offset
-        offset += pc[batch_id].shape[0]
+        offset += pc[batch_id].shape[0] #num pts in this pc
 
     offset = 0
     for batch_id in range(len(coords)):
 
         # Move batchids to the beginning
         coords[batch_id][:, 0] = batch_id
-        pairing_images[batch_id][:, 0] += batch_id * images[0].shape[0]
+        pairing_images[batch_id][:, 0] += batch_id * images[0].shape[0] # += b_id * 6 img views
 
-        batch_n_points.append(coords[batch_id].shape[0])
-        batch_n_pairings.append(pairing_points[batch_id].shape[0])
-        offset += coords[batch_id].shape[0]
+        batch_n_points.append(coords[batch_id].shape[0]) #num voxels in this pc
+        batch_n_pairings.append(pairing_points[batch_id].shape[0]) #num FOV pts in this PC
+        offset += coords[batch_id].shape[0] #not needed
 
     # Concatenate all lists
-    coords_batch = torch.cat(coords, 0).int()
-    pc_batch = torch.cat(pc_batch, 0)
-    pairing_points = torch.tensor(np.concatenate(pairing_points))
-    pairing_images = torch.tensor(np.concatenate(pairing_images))
-    feats_batch = torch.cat(feats, 0).float()
-    images_batch = torch.cat(images, 0).float()
-    superpixels_batch = torch.tensor(np.concatenate(superpixels))
-    num_points = torch.cat(num_points, 0)
-    feats_batch = mean_vfe(feats_batch, num_points)
+    coords_batch = torch.cat(coords, 0).int() #[num voxels in batch, 4= bid, zyx vox coord]
+    pc_batch = torch.cat(pc_batch, 0) #[num pts in batch, 5=bid, xyzi pt]
+    pairing_points = torch.tensor(np.concatenate(pairing_points)) #[num pairing pts in batch, 1=their absolute index in pc_batch]
+    pairing_images = torch.tensor(np.concatenate(pairing_images)) #[num pairing pts in batch, 3=(img id from 0 to bs*6views), v pix, u pix]
+    feats_batch = torch.cat(feats, 0).float() #[num voxels in batch, 10 pts per voxel, 4=xyzi pt]
+    images_batch = torch.cat(images, 0).float() #[bs*6, 3, H, W]
+    superpixels_batch = torch.tensor(np.concatenate(superpixels))#[bs*6, H, W]
+    num_points = torch.cat(num_points, 0) #[num voxels in batch]
+    feats_batch = mean_vfe(feats_batch, num_points) # mean feature each voxel = [num voxels in batch, 4=mean xyzi]
     return {
         "pc": pc_batch,
         "coordinates": coords_batch,
@@ -136,11 +136,13 @@ class NuScenesMatchDatasetSpconv(Dataset):
         self.bilinear_decoder = config["decoder"] == "bilinear"
         self.num_point_features = 4
 
+        version=config['version']
+        nuscenes_path = f"datasets/nuscenes/{version}"
         if "cached_nuscenes" in kwargs:
             self.nusc = kwargs["cached_nuscenes"]
         else:
             self.nusc = NuScenes(
-                version="v1.0-trainval", dataroot="datasets/nuscenes", verbose=False
+                version=version, dataroot=nuscenes_path, verbose=False
             )
 
         self.list_keyframes = []
@@ -332,7 +334,7 @@ class NuScenesMatchDatasetSpconv(Dataset):
 
         pc = torch.cat((pc, intensity), 1)
 
-        voxels, coordinates, num_points = self._voxelize(pc)
+        voxels, coordinates, num_points = self._voxelize(pc) # voxels: [num voxels, 10 pts, 4=xyzi], coord: [num voxels, 3=zyx vox coord], num_points: [num voxels, num points per voxel]
 
         discrete_coords = torch.cat(
             (
@@ -340,7 +342,7 @@ class NuScenesMatchDatasetSpconv(Dataset):
                 coordinates,
             ),
             1,
-        )
+        ) #[num voxels, 4=0,zyx vox coord]
         voxels = voxels
         num_points = num_points
 
@@ -349,7 +351,7 @@ class NuScenesMatchDatasetSpconv(Dataset):
             discrete_coords,
             voxels,
             images,
-            pairing_points,
+            pairing_points, # (N=num FOV pts) indices of FOV pts in pc
             pairing_images,
             num_points,
             superpixels,
