@@ -374,8 +374,8 @@ class HeightCompression(nn.Module):
         """
         # encoded_spconv_tensor = batch_dict['encoded_spconv_tensor']
         spatial_features = encoded_spconv_tensor.dense()
-        N, C, D, H, W = spatial_features.shape
-        spatial_features = spatial_features.view(N, C * D, H, W)
+        N, C, D, H, W = spatial_features.shape #6, 64, 1, 128, 128
+        spatial_features = spatial_features.view(N, C * D, H, W) #bs=6, C=64, H=128, W=128
         return spatial_features
 
 
@@ -384,7 +384,7 @@ class VoxelNet(VoxelBackBone8x):
         self.bev_stride = 8
         voxel_size = [0.1, 0.1, 0.2]  # nuScenes
         point_cloud_range = np.array([-51.2, -51.2, -5.0, 51.2, 51.2, 3.0], dtype=np.float32)  # nuScenes
-        self.grid_size = ((point_cloud_range[3:] - point_cloud_range[:3]) / voxel_size).astype(int)[::-1]
+        self.grid_size = ((point_cloud_range[3:] - point_cloud_range[:3]) / voxel_size).astype(int)[::-1] #40, 1024, 1024
         self.bach_size = config["batch_size"]
         super().__init__(in_channels, self.grid_size)
         self.final = spconv.SparseConv3d(
@@ -405,8 +405,8 @@ class VoxelNet(VoxelBackBone8x):
             spatial_shape=self.grid_size,
             batch_size=self.bach_size
         )
-        sp_tensor = super(VoxelNet, self).forward(sp_tensor)
-        sp_tensor = self.final(sp_tensor)
+        sp_tensor = super(VoxelNet, self).forward(sp_tensor) #spatial shape: [1, 128, 128] feats: [num downsampled voxels, 128]
+        sp_tensor = self.final(sp_tensor) #spatial shape: [1, 128, 128] feats: [num downsampled voxels, 64]
         sp_tensor = sp_tensor.replace_feature(nn.functional.normalize(sp_tensor.features, dim=1))
-        sp_tensor = self.height_compression(sp_tensor)
+        sp_tensor = self.height_compression(sp_tensor) #outputs dense tensor of size [bs=6, C=64, H=128, W=128]
         return sp_tensor

@@ -95,7 +95,7 @@ class ComposeAsymmetrical:
 
 class ResizedCrop:
     """
-    Resize and crop an image, and adapt the pairings accordingly.
+    Resize and crop an image, and adapt the pairings accordingly. images, superpixels, pairing_points, pairing_images are cropped, not pc and features!
     """
 
     def __init__(
@@ -115,12 +115,12 @@ class ResizedCrop:
     def __call__(self, pc, features, images, pairing_points, pairing_images, superpixels):
         imgs = torch.empty(
             (images.shape[0], 3) + tuple(self.crop_size), dtype=torch.float32
-        )
+        ) #(6 views, 3, 224, 416)
         if superpixels is not None:
-            superpixels = superpixels.unsqueeze(1)
+            superpixels = superpixels.unsqueeze(1) #(6 views, 1, 900, 1600)
             sps = torch.empty(
                 (images.shape[0],) + tuple(self.crop_size), dtype=torch.uint8
-            )
+            ) #(6 views, 224, 416)
         pairing_points_out = np.empty(0, dtype=np.int64)
         pairing_images_out = np.empty((0, 3), dtype=np.int64)
         if self.crop_center:
@@ -149,7 +149,7 @@ class ResizedCrop:
                 mask = pairing_images[:, 0] == id
                 P1 = pairing_points[mask]
                 P2 = pairing_images[mask]
-                while not successfull:
+                while not successfull: #get randomresizecrop params that leave atleast 1024 FOV pts after cropping the image with those params
                     i, j, h, w = RandomResizedCrop.get_params(
                         img, self.crop_range, self.crop_ratio
                     )
@@ -172,7 +172,7 @@ class ResizedCrop:
                     sum_indexes = valid_indexes.sum()
                     len_indexes = len(valid_indexes)
                     if sum_indexes > 1024 or sum_indexes / len_indexes > 0.75:
-                        successfull = True
+                        successfull = True #atleast 1024 FOV pts should be left after cropping image
                 imgs[id] = resized_crop(
                     img, i, j, h, w, self.crop_size, self.img_interpolation
                 )
@@ -199,7 +199,7 @@ class ResizedCrop:
 
 class FlipHorizontal:
     """
-    Flip horizontaly the image with probability p and adapt the matching accordingly.
+    Flip horizontaly the image, superpixels with probability p and adapt the matching (FOV pt pixels) accordingly.
     """
 
     def __init__(self, p=0.5):
@@ -220,7 +220,7 @@ class FlipHorizontal:
 
 class DropCuboids:
     """
-    Drop random cuboids in a cloud
+    Drop random cuboids in a cloud (in pairing/fov pts and their pixels as well). Don't crop images
     """
 
     def __call__(self, pc, features, images, pairing_points, pairing_images, superpixels):
@@ -237,20 +237,20 @@ class DropCuboids:
         upper_idx = torch.sum((pc[:, 0:3] < max_xyz).to(torch.int32), 1) == 3
         lower_idx = torch.sum((pc[:, 0:3] > min_xyz).to(torch.int32), 1) == 3
 
-        new_pointidx = ~((upper_idx) & (lower_idx))
+        new_pointidx = ~((upper_idx) & (lower_idx)) # mask of uncropped pts
         pc_out = pc[new_pointidx]
         features_out = features[new_pointidx]
 
-        mask = new_pointidx[pairing_points]
-        cs = torch.cumsum(new_pointidx, 0) - 1
+        mask = new_pointidx[pairing_points] # uncropped pts mask and pairing pts mask
+        cs = torch.cumsum(new_pointidx, 0) - 1 # cumsum of uncropped pts mask
         pairing_points_out = pairing_points[mask]
-        pairing_points_out = cs[pairing_points_out]
+        pairing_points_out = cs[pairing_points_out] # cumsum of uncropped pts and pairing/FOV pts i.e. pt_idx-1 of new_pointidx that are also FOV pts 
         pairing_images_out = pairing_images[mask]
 
         successfull = True
         for id in range(len(images)):
             if np.sum(pairing_images_out[:, 0] == id) < 1024:
-                successfull = False
+                successfull = False #atleast 1024 FOV pts should remain after cropping
         if successfull:
             return (
                 pc_out,
@@ -260,7 +260,7 @@ class DropCuboids:
                 np.array(pairing_images_out),
                 superpixels,
             )
-        return pc, features, images, pairing_points, pairing_images, superpixels
+        return pc, features, images, pairing_points, pairing_images, superpixels #otherwise don't crop
 
 
 def make_transforms_asymmetrical(config):

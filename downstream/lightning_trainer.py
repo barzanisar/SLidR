@@ -103,7 +103,7 @@ class LightningDownstream(pl.LightningModule):
         return self.model(x).F
 
     def training_step(self, batch, batch_idx):
-        if self._config["freeze_layers"]:
+        if self._config["freeze_layers"]: #TODO
             self.model.eval()
         else:
             self.model.train()
@@ -135,20 +135,20 @@ class LightningDownstream(pl.LightningModule):
 
         # Ensure we ignore the index 0
         # (probably not necessary after some training)
-        output_points = output_points.softmax(1)
+        output_points = output_points.softmax(1) #probabilities (num voxels in batch, 17 classes)
         if self.ignore_index is not None:
             output_points[:, self.ignore_index] = 0.0
         preds = []
         labels = []
         offset = 0
-        output_points = output_points.argmax(1)
+        output_points = output_points.argmax(1) #(num voxels in batch) pred class for each voxel 0-16 
         for i, lb in enumerate(batch["len_batch"]):
-            preds.append(output_points[batch["inverse_indexes"][i] + offset])
-            labels.append(batch["evaluation_labels"][i])
+            preds.append(output_points[batch["inverse_indexes"][i] + offset]) # get pred label for each point using voxel-to-pc id
+            labels.append(batch["evaluation_labels"][i]) #gt label for each pt
             offset += lb
         preds = torch.cat(preds, dim=0)
         labels = torch.cat(labels, dim=0)
-        c_matrix = confusion_matrix(preds, labels, self.n_classes)
+        c_matrix = confusion_matrix(preds, labels, self.n_classes) #point-wise pred label for all points in the batch, gt label for all points in the batch, 17 classes
         return loss, c_matrix
 
     def validation_epoch_end(self, outputs):

@@ -115,17 +115,17 @@ class LightningPretrainSpconv(pl.LightningModule):
         optimizer.zero_grad(set_to_none=True)
 
     def training_step(self, batch, batch_idx):
-        output_points = self.model_points(batch["voxels"], batch["coordinates"])
-        output_points = interpolate_from_bev_features(batch["pc"], output_points, self.batch_size, self.model_points.bev_stride)
+        output_points = self.model_points(batch["voxels"], batch["coordinates"]) #downsampled bev feats: [6=bs, C=64, H=128, W=128]
+        output_points = interpolate_from_bev_features(batch["pc"], output_points, self.batch_size, self.model_points.bev_stride) #interpolate bev feats at orig pc pts to get pt-wise feats:[num pts in batch, 64]
         self.model_images.eval()
         self.model_images.decoder.train()
-        output_images = self.model_images(batch["input_I"])
+        output_images = self.model_images(batch["input_I"]) #[bs*6views, 64, img H, img W]
 
         del batch["voxels"]
         del batch["coordinates"]
         # each loss is applied independtly on each GPU
         losses = [
-            getattr(self, loss)(batch, output_points, output_images)
+            getattr(self, loss)(batch, output_points, output_images) # input: pt-wise feats, img feats
             for loss in self.losses
         ]
         loss = torch.mean(torch.stack(losses))

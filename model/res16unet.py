@@ -228,19 +228,19 @@ class Res16UNetBase(ResNetBase):
         self.relu = MinkowskiReLU(inplace=True)
 
     def forward(self, x):
-        out = self.conv0p1s1(x)
-        out = self.bn0(out)
-        out_p1 = self.relu(out)
+        out = self.conv0p1s1(x) #stem
+        out = self.bn0(out) #stem
+        out_p1 = self.relu(out) #stem
 
-        out = self.conv1p1s2(out_p1)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out_b1p2 = self.block1(out)
+        out = self.conv1p1s2(out_p1) #stage 1, basic block 0 
+        out = self.bn1(out) #stage 1, basic block 0 
+        out = self.relu(out) #stage 1, basic block 0 
+        out_b1p2 = self.block1(out)   #stage 1, residual block 1 and 2 has [conv3d, bn, relu, conv3d, bn, relu] but this has  2x[conv3d, bn, conv3d, bn, relu]
 
-        out = self.conv2p2s2(out_b1p2)
-        out = self.bn2(out)
-        out = self.relu(out)
-        out_b2p4 = self.block2(out)
+        out = self.conv2p2s2(out_b1p2) #stage 2, basic block 0
+        out = self.bn2(out) #stage 2, basic block 0
+        out = self.relu(out) #stage 2, basic block 0
+        out_b2p4 = self.block2(out) #stage 2, residual block 1 and 2  has [conv3d, bn, relu, conv3d, bn, downsample, relu] but this has  2x[conv3d, bn, conv3d, bn, relu, downsample]
 
         out = self.conv3p4s2(out_b2p4)
         out = self.bn3(out)
@@ -280,7 +280,7 @@ class Res16UNetBase(ResNetBase):
         out = me.cat(out, out_p1)
         out = self.block8(out)
 
-        out = self.final(out)
+        out = self.final(out) #F: (num voxels, 64)
 
         if self.normalize_feature:
             return SparseTensor(

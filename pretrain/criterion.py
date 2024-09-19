@@ -13,6 +13,8 @@ class NCELoss(nn.Module):
         self.criterion = nn.CrossEntropyLoss()
 
     def forward(self, k, q):
+        # k = [num segments i.e. superpoints, 64] segment features from point backbone
+        # q = [num segments i.e. superpixels, 64] segment features from img backbone
         logits = torch.mm(k, q.transpose(1, 0))
         target = torch.arange(k.shape[0], device=k.device).long()
         out = torch.div(logits, self.temperature)
