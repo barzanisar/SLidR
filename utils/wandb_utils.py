@@ -32,11 +32,11 @@ def init_or_resume_wandb_run(wandb_id_file_path,
         # and write the run id the file
         print("path not exists init wandb")
         print(config["wandb"])
-        run = wandb.init(name=config["wandb"]["run_name"], config=config,
+        run = wandb.init(name=config["wandb"]["run_name"], config=None,
                             project=config["wandb"]["project"],
                             entity=config["wandb"]["entity"],
                             group=config["wandb"]["group"],
-                            job_type=config["wandb"]["job_type"])
+                            job_type=config["wandb"]["job_type"], dir=config["wandb"]["dir"])
         print("init wandb")
         wandb_id_file_path.write_text(str(run.id))
 
