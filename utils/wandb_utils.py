@@ -31,6 +31,7 @@ def init_or_resume_wandb_run(wandb_id_file_path,
         # if the run_id doesn't exist, then create a new run
         # and write the run id the file
         print("path not exists init wandb")
+        print(config["wandb"])
         run = wandb.init(name=config["wandb"]["run_name"], config=config,
                             project=config["wandb"]["project"],
                             entity=config["wandb"]["entity"],
