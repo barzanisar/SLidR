@@ -50,6 +50,8 @@ def main():
             "\n" + "\n".join(list(map(lambda x: f"{x[0]:20}: {x[1]}", config.items())))
         )
 
+    print("1. Creating output directories:")
+
     logging.info(f"Creating output directories: ")
     savedir_root = os.path.join(config["save_dir"], "Pretraining", config['desc'], config["extra_tag"])
     if os.environ.get("LOCAL_RANK", 0) == 0:
@@ -59,6 +61,7 @@ def main():
     logging.info(f"Savedir_root: {savedir_root}")
     logging.info(f"checkpoints_dir: {checkpoints_dir}")
     
+    print("2. wandb logger")
     wandb_logger = None
     if config.get("wandb", {}).get("enabled"):
         run_id_file = Path(savedir_root)/ 'wandb_run_id.txt'
@@ -81,7 +84,7 @@ def main():
     config["resume_path"] = resume_path
     logging.info(f"Ckpt resume_path: {resume_path}")
 
-
+    print("3. datamodule, model, ")
     dm = PretrainDataModule(config)
     model_points, model_images = make_model(config)
     if config["num_gpus"] > 1:
@@ -94,7 +97,7 @@ def main():
     #path = os.path.join(config["working_dir"], config["datetime"])
     # ckpt_path=os.path.join(path, 'ckpts')
 
-
+    print("4. checkpoointing")
     checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoints_dir,
         filename="{epoch:02d}",
@@ -102,6 +105,8 @@ def main():
         save_top_k=-1,
         save_last=True
     )
+
+    print("5. trainer")
     trainer = pl.Trainer(
         gpus=config["num_gpus"],
         accelerator="cuda",
