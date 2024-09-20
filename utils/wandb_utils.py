@@ -20,6 +20,7 @@ def init_or_resume_wandb_run(wandb_id_file_path,
     
     if wandb_id_file_path.exists():
         resume_id = wandb_id_file_path.read_text()
+        print("path exists init wandb")
         wandb.init(name=config["wandb"]["run_name"], config=config,
                             project=config["wandb"]["project"],
                             entity=config["wandb"]["entity"],
@@ -29,6 +30,7 @@ def init_or_resume_wandb_run(wandb_id_file_path,
     else:
         # if the run_id doesn't exist, then create a new run
         # and write the run id the file
+        print("path not exists init wandb")
         run = wandb.init(name=config["wandb"]["run_name"], config=config,
                             project=config["wandb"]["project"],
                             entity=config["wandb"]["entity"],
@@ -36,6 +38,7 @@ def init_or_resume_wandb_run(wandb_id_file_path,
                             job_type=config["wandb"]["job_type"], dir=config["wandb"]["dir"])
         wandb_id_file_path.write_text(str(run.id))
 
+    print("update config")
     wandb_config = wandb.config
     if config is not None:
         # update the current passed in config with the wandb_config

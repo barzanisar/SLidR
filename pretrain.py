@@ -67,7 +67,9 @@ def main():
         run_id_file = Path(savedir_root)/ 'wandb_run_id.txt'
         config['wandb']['group'] = config['extra_tag']
         config['wandb']['job_type'] = 'pretrain'
+        print("2. init resume")
         init_or_resume_wandb_run(run_id_file, config)
+        print("2. wandb logger instantiate")
         wandb_logger = pl_loggers.WandbLogger(experiment=wandb.run)
         wandb_logger.log_dir = savedir_root
 
