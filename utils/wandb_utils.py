@@ -36,7 +36,7 @@ def init_or_resume_wandb_run(wandb_id_file_path,
                             project=config["wandb"]["project"],
                             entity=config["wandb"]["entity"],
                             group=config["wandb"]["group"],
-                            job_type=config["wandb"]["job_type"], dir=config["wandb"]["dir"])
+                            job_type=config["wandb"]["job_type"])
         print("init wandb")
         wandb_id_file_path.write_text(str(run.id))
 
