@@ -36,7 +36,11 @@ RUN pip install tqdm pyquaternion
 RUN pip install pytorch_lightning==1.6.0
 RUN pip install pillow==8.3.1
 RUN pip install scikit-image==0.18.2 
-RUN pip install wandb==0.13.1
+RUN pip install wandb==0.15.12
+RUN pip install opencv-python==4.3.0.36  
+#NOTE: Downgrading opencv-python from 4.4.10 to 4.3.0.36 solves both glib.so error on turing and seg fault due to wandb init 
+## installing opencv-python-headless can also solve the issue of glib.so according to letian
+
 
 WORKDIR /slidr
 RUN git config --global --add safe.directory /slidr
