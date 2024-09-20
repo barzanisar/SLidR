@@ -13,7 +13,7 @@ wandb:
   project: ReconsDistill
   entity: trailab
   run_name: orig-slidr-slic-nuscenes-res16unet34c-mocov2-resnet50
-  dir: '/SLidR/output'
+  dir: '/slidr/output'
 
 # if set to True, use cylindrical coordinates, otherwise use cartesian
 cylindrical_coordinates : True
