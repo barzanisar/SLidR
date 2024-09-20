@@ -36,6 +36,7 @@ def init_or_resume_wandb_run(wandb_id_file_path,
                             entity=config["wandb"]["entity"],
                             group=config["wandb"]["group"],
                             job_type=config["wandb"]["job_type"], dir=config["wandb"]["dir"])
+        print("init wandb")
         wandb_id_file_path.write_text(str(run.id))
 
     print("update config")
