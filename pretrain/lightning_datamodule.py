@@ -51,7 +51,7 @@ class PretrainDataModule(pl.LightningDataModule):
             phase_val = "val"
         self.train_dataset = Dataset(
             phase=phase_train,
-            shuffle=True,
+            shuffle=False,
             cloud_transforms=cloud_transforms_train,
             mixed_transforms=mixed_transforms_train,
             config=self.config,
@@ -79,7 +79,7 @@ class PretrainDataModule(pl.LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=False,
             num_workers=num_workers,
             collate_fn=default_collate_pair_fn,
             pin_memory=True,

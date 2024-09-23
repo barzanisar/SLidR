@@ -17,7 +17,7 @@ from pretrain.lightning_datamodule import PretrainDataModule
 from pretrain.lightning_trainer_spconv import LightningPretrainSpconv
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-
+pl.seed_everything(42, workers=True)
 
 def main():
     """
@@ -111,8 +111,9 @@ def main():
         resume_from_checkpoint=resume_path,
         logger=wandb_logger,
         max_epochs=25,
-        check_val_every_n_epoch=1,
-        log_every_n_steps=100
+        check_val_every_n_epoch=5,
+        log_every_n_steps=100, deterministic=True,
+        replace_sampler_ddp=False
 
     )
     print("Starting the training")

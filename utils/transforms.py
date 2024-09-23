@@ -84,6 +84,8 @@ class ComposeAsymmetrical:
         self.transforms = transforms
 
     def __call__(self, pc, features, img, pairing_points, pairing_images, superpixels=None):
+        random.seed(42)
+        torch.manual_seed(42)
         for transform in self.transforms:
             pc, features, img, pairing_points, pairing_images, superpixels = transform(
                 pc, features, img, pairing_points, pairing_images, superpixels
