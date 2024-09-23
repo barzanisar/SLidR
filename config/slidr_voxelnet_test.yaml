@@ -1,5 +1,5 @@
 dataset : "nuscenes"
-version: "v1.0-trainval"
+version: "v1.0-mini" #"v1.0-trainval"
 working_dir : "output/slidr/nuscenes/"
 # if set to True, use cylindrical coordinates, otherwise use cartesian
 cylindrical_coordinates : False
@@ -17,7 +17,7 @@ num_epochs : 50
 dropout : 0.
 # number of GPUs and CPU threads to use
 num_gpus : 1
-num_threads : 4
+num_threads : 1 #4
 kernel_size : 3
 model_n_out : 64
 bn_momentum : 0.05
