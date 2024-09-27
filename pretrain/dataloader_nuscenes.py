@@ -215,8 +215,9 @@ class NuScenesMatchDataset(Dataset):
 
 
         if self.sample_points is not None:
-            indices_selected = np.random.choice(pc_original.points.shape[1], self.sample_points, replace=False)
-            pc_original.points = pc_original.points[:,indices_selected]
+            if self.sample_points < pc_original.points.shape[1]:
+                indices_selected = np.random.choice(pc_original.points.shape[1], self.sample_points, replace=False)
+                pc_original.points = pc_original.points[:,indices_selected]
         
         
             
