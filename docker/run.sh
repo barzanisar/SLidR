@@ -30,7 +30,7 @@ docker run -it \
         --volume ${NUSCENES_VOLUME} \
         --volume ${SUPERPIXELS_VOLUME} \
         --rm \
-        slidr:latest bash
+        slidr:torch230 bash
         # --rm \ #remove this if you want to keep the container to commit changes
         #slidr:latest is the original slidr env
         #slidr:torch230 is the ALSO env

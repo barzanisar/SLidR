@@ -108,7 +108,7 @@ class LightningDownstream(pl.LightningModule):
         else:
             self.model.train()
         sparse_input = SparseTensor(batch["sinput_F"], batch["sinput_C"])
-        output_points = self(sparse_input)
+        output_points = self(sparse_input) #voxel-wise feats (num vox, 17)
 
         loss = self.criterion(output_points, batch["labels"])
         # empty the cache to reduce the memory requirement: ME is known to slowly

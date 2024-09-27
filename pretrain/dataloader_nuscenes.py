@@ -145,6 +145,7 @@ class NuScenesMatchDataset(Dataset):
         self.superpixels_type = config["superpixels_type"]
         self.bilinear_decoder = config["decoder"] == "bilinear"
         self.sample_points = config.get("sample_points", None)
+        self.voxel_decimation = config.get("voxel_decimation", False)
 
         version=config['version']
         nuscenes_path = f"datasets/nuscenes/{version}"
@@ -203,9 +204,21 @@ class NuScenesMatchDataset(Dataset):
         pcl_path = os.path.join(self.nusc.dataroot, pointsensor["filename"])
         pc_original = LidarPointCloud.from_file(pcl_path)
         
+        if self.voxel_decimation:
+            pos = pc_original.points.T
+            pos = (pos/0.1).astype(int) # each point represented as voxel coordinates
+            num_pts = pos.shape[0]
+
+            # Numpy version
+            _, indices = np.unique(pos, return_index=True, axis=0) #find unique voxels
+            pc_original.points = pc_original.points[:, indices]
+
+
         if self.sample_points is not None:
             indices_selected = np.random.choice(pc_original.points.shape[1], self.sample_points, replace=False)
             pc_original.points = pc_original.points[:,indices_selected]
+        
+        
             
         pc_ref = pc_original.points
 
