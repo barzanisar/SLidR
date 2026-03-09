@@ -1,4 +1,5 @@
 dataset : "nuscenes"
+version: "v1.0-mini" #"v1.0-trainval"
 working_dir : "output/semseg/nuscenes/"
 # if set to True, use cylindrical coordinates, otherwise use cartesian
 cylindrical_coordinates : True
